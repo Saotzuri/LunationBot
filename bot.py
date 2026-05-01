@@ -328,16 +328,23 @@ async def post_raids() -> int:
         return 0
 
     # Debug: Print response structure
-    logger.info(f"API Response type: {type(raids)}")
-    if raids:
-        logger.info(f"First item type: {type(raids[0])}")
-        logger.info(f"First item: {raids[0]}")
+    logger.info(f"API Response: {raids}")
 
     # Handle different response formats
     if isinstance(raids, dict):
-        raids = raids.get("raids", [])
+        # Check common keys
+        if "raids" in raids:
+            raids = raids["raids"]
+        elif "data" in raids:
+            raids = raids["data"]
+        else:
+            logger.warning(f"Unknown dict keys: {raids.keys()}")
+            return 0
     elif isinstance(raids, str):
-        logger.warning(f"API returned string instead of list: {raids}")
+        logger.warning(f"API returned string: {raids}")
+        return 0
+    elif not isinstance(raids, list):
+        logger.warning(f"Unknown response type: {type(raids)}")
         return 0
 
     guild = client.get_guild(GUILD_ID)
