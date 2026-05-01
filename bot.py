@@ -8,7 +8,7 @@ from config import (
     GUILD_ID, WILLKOMMEN_CHANNEL_ID, RULES_CHANNEL_ID,
     MEMBER_ROLE_ID, OFFIZIER_ROLE_ID, BEWERBUNG_KATEGORIE_ID,
     OFFIZIER_PING_CHANNEL_ID, TRIAL_ROLE_ID, TRANSCRIPTS_CHANNEL_ID,
-    KUMMERKASTEN_KATEGORIE_ID
+    KUMMERKASTEN_KATEGORIE_ID, RAID_SIGNUP_CHANNEL_ID
 )
 from utils.wowaudit import wowaudit_api
 
@@ -352,10 +352,18 @@ async def post_raids() -> int:
     if not guild:
         return 0
 
-    # Use timezone-aware datetime
-    tz = datetime.now().astimezone().tzinfo
+    # Use timezone-aware datetime (Europe/Berlin = CEST)
+    import zoneinfo
+    try:
+        tz = zoneinfo.ZoneInfo("Europe/Berlin")
+    except:
+        tz = datetime.now().astimezone().tzinfo
     now = datetime.now(tz)
     cutoff = now + timedelta(days=auto_post_days)
+
+    # Get raid signup channel for location
+    raid_channel = guild.get_channel(RAID_SIGNUP_CHANNEL_ID)
+    location = raid_channel.mention if raid_channel else "WoWAudit"
     count = 0
 
     for raid in raids:
@@ -398,7 +406,7 @@ async def post_raids() -> int:
                     description=description,
                     start_time=raid_datetime,
                     end_time=raid_end_datetime,
-                    location="WoWAudit",
+                    location=location,
                     entity_type=EntityType.external,
                     privacy_level=discord.PrivacyLevel.guild_only
                 )
