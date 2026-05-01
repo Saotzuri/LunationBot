@@ -2,6 +2,7 @@ import discord
 import logging
 import asyncio
 from discord import app_commands
+from discord.app_commands import Cog
 from datetime import datetime, timedelta
 from config import GUILD_ID, OFFIZIER_ROLE_ID
 from utils.wowaudit import wowaudit_api
@@ -13,7 +14,7 @@ auto_post_days = 0
 posted_raids = set()
 
 
-class RaidEventsCog(discord.app_commands.Cog):
+class RaidEventsCog(Cog):
     def __init__(self, bot):
         self.bot = bot
         self.bg_task = None

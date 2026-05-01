@@ -1,6 +1,7 @@
 import discord
 import logging
 from discord import app_commands
+from discord.app_commands import Cog
 from config import GUILD_ID, OFFIZIER_ROLE_ID, KUMMERKASTEN_KATEGORIE_ID
 
 logger = logging.getLogger("lunation-bot")
@@ -94,7 +95,7 @@ class TicketSchliessenView(discord.ui.View):
         logger.info(f"Kummerkasten Ticket geschlossen von {interaction.user.name}")
 
 
-class KummerkastenCog(discord.app_commands.Cog):
+class KummerkastenCog(Cog):
     def __init__(self, bot):
         self.bot = bot
 

@@ -1,6 +1,7 @@
 import discord
 import logging
 from discord import app_commands
+from discord.app_commands import Cog
 from config import (
     GUILD_ID, OFFIZIER_ROLE_ID, BEWERBUNG_KATEGORIE_ID,
     OFFIZIER_PING_CHANNEL_ID, TRIAL_ROLE_ID, TRANSCRIPTS_CHANNEL_ID
@@ -203,7 +204,7 @@ class BewerbungEntscheidungView(discord.ui.View):
             logger.warning(f"Channel bereits gelöscht für {self.bewerber_name}")
 
 
-class BewerbungCog(discord.app_commands.Cog):
+class BewerbungCog(Cog):
     def __init__(self, bot):
         self.bot = bot
 
