@@ -23,4 +23,4 @@ KUMMERKASTEN_KATEGORIE_ID = 1498405467477643355
 
 # API
 WOWAUDIT_TOKEN = os.getenv("WOWAUDIT_TOKEN")
-WOWAUDIT_API_BASE = "https://api.wowaudit.com/v1"
+WOWAUDIT_API_BASE = "https://wowaudit.com/v1"
