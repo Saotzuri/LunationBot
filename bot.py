@@ -36,6 +36,8 @@ BEWERBUNG_CHANNEL_ID = 1498614623065215007
 OFFIZIER_ROLE_ID = 1498401628347437197
 OFFIZIER_PING_CHANNEL_ID = 1499744209798955049
 BEWERBUNG_KATEGORIE_ID = 1498612750073462784
+TRIAL_ROLE_ID = 1498403894857044040
+TRANSCRIPTS_CHANNEL_ID = 1499747813070737518
 
 # --- Modal ---
 
@@ -109,7 +111,7 @@ class BewerbungModal(discord.ui.Modal, title="Bewerbung bei Lunation"):
         embed.add_field(name="Warum Lunation?", value=self.warum.value, inline=False)
         embed.set_footer(text=f"User ID: {interaction.user.id}")
 
-        await privater_channel.send(embed=embed)
+        await privater_channel.send(embed=embed, view=BewerbungEntscheidungView(interaction.user.id, interaction.user.name))
 
         # Bewerber + Offiziere im privaten Channel begrüßen
         await privater_channel.send(
@@ -129,7 +131,7 @@ class BewerbungModal(discord.ui.Modal, title="Bewerbung bei Lunation"):
         logger.info(f"Bewerbung von {interaction.user.name} ({interaction.user.id}) eingegangen, privater Channel erstellt")
 
         await interaction.response.send_message(
-            f"Deine Bewerbung wurde erfolgreich abgeschickt! Schau hier rein: {privater_channel.mention} 🌙",
+            f"Deine Bewerbung wurde erfolgreich abgeschickt! Schau hier rein: {privater_channel.mention}",
             ephemeral=True
         )
 
@@ -148,6 +150,69 @@ class BewerbungButton(discord.ui.View):
     )
     async def bewerbung(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_modal(BewerbungModal())
+
+
+# --- Bewerbung Entscheidung Buttons ---
+
+class BewerbungEntscheidungView(discord.ui.View):
+    def __init__(self, bewerber_id: int, bewerber_name: str):
+        super().__init__(timeout=None)
+        self.bewerber_id = bewerber_id
+        self.bewerber_name = bewerber_name
+
+    @discord.ui.button(label="Annehmen", style=discord.ButtonStyle.green, emoji="✅", custom_id="bewerbung_annehmen")
+    async def annehmen(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not interaction.guild.get_role(OFFIZIER_ROLE_ID) in interaction.user.roles:
+            await interaction.response.send_message("Nur Offiziere können diese Aktion durchführen.", ephemeral=True)
+            return
+
+        guild = interaction.guild
+        bewerber = guild.get_member(self.bewerber_id)
+        trial_role = guild.get_role(TRIAL_ROLE_ID)
+
+        # Transcript erstellen und in den Transcripts-Channel posten
+        transcripts_channel = client.get_channel(TRANSCRIPTS_CHANNEL_ID)
+        if transcripts_channel:
+            embed = discord.Embed(
+                title=f"Bewerbung genehmigt – {self.bewerber_name}",
+                color=discord.Color.from_rgb(0, 255, 0)
+            )
+            embed.add_field(name="Bewerber", value=f"<@{self.bewerber_id}>", inline=False)
+            embed.add_field(name="Entscheidung", value="Angenommen", inline=False)
+            embed.add_field(name="Bearbeitet von", value=interaction.user.mention, inline=False)
+            await transcripts_channel.send(embed=embed)
+
+        # Trial-Rolle geben
+        if bewerber and trial_role:
+            await bewerber.add_roles(trial_role)
+            logger.info(f"Trial-Rolle an {bewerber.name} vergeben")
+
+        # Channel löschen
+        await interaction.channel.delete()
+        logger.info(f"Bewerbung von {self.bewerber_name} angenommen, Channel gelöscht")
+
+    @discord.ui.button(label="Ablehnen", style=discord.ButtonStyle.red, emoji="❌", custom_id="bewerbung_ablehnen")
+    async def ablehnen(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not interaction.guild.get_role(OFFIZIER_ROLE_ID) in interaction.user.roles:
+            await interaction.response.send_message("Nur Offiziere können diese Aktion durchführen.", ephemeral=True)
+            return
+
+        # Transcript erstellen und in den Transcripts-Channel posten
+        transcripts_channel = client.get_channel(TRANSCRIPTS_CHANNEL_ID)
+        if transcripts_channel:
+            embed = discord.Embed(
+                title=f"Bewerbung abgelehnt – {self.bewerber_name}",
+                color=discord.Color.from_rgb(255, 0, 0)
+            )
+            embed.add_field(name="Bewerber", value=f"<@{self.bewerber_id}>", inline=False)
+            embed.add_field(name="Entscheidung", value="Abgelehnt", inline=False)
+            embed.add_field(name="Bearbeitet von", value=interaction.user.mention, inline=False)
+            await transcripts_channel.send(embed=embed)
+
+        # Bewerbung schließen
+        await interaction.response.send_message("Bewerbung abgelehnt.", ephemeral=True)
+        await interaction.channel.delete()
+        logger.info(f"Bewerbung von {self.bewerber_name} abgelehnt, Channel gelöscht")
 
 
 # --- Command zum Posten des Bewerbungs-Embeds ---
