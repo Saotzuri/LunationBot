@@ -351,7 +351,9 @@ async def post_raids() -> int:
     if not guild:
         return 0
 
-    now = datetime.now()
+    # Use timezone-aware datetime
+    tz = datetime.now().astimezone().tzinfo
+    now = datetime.now(tz)
     cutoff = now + timedelta(days=auto_post_days)
     count = 0
 
@@ -376,9 +378,9 @@ async def post_raids() -> int:
         try:
             raid_date = datetime.strptime(raid_date_str, "%Y-%m-%d")
             hour, minute = map(int, raid_time.split(":"))
-            raid_datetime = raid_date.replace(hour=hour, minute=minute)
+            raid_datetime = raid_date.replace(hour=hour, minute=minute).astimezone(tz)
             end_hour, end_minute = map(int, raid_end_time.split(":"))
-            raid_end_datetime = raid_date.replace(hour=end_hour, minute=end_minute)
+            raid_end_datetime = raid_date.replace(hour=end_hour, minute=end_minute).astimezone(tz)
         except Exception as e:
             logger.warning(f"Date parse error: {e}")
             continue
