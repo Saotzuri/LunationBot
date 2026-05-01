@@ -138,6 +138,7 @@ class BewerbungButton(discord.ui.View):
 # --- Command zum Posten des Bewerbungs-Embeds ---
 
 @client.tree.command(name="bewerbung-setup", description="Postet den Bewerbungs-Embed im aktuellen Channel")
+@app_commands.guilds(1498401477104762910)
 @app_commands.checks.has_permissions(administrator=True)
 async def bewerbung_setup(interaction: discord.Interaction):
     embed = discord.Embed(
