@@ -187,6 +187,18 @@ class BewerbungEntscheidungView(discord.ui.View):
             await bewerber.add_roles(trial_role)
             logger.info(f"Trial-Rolle an {bewerber.name} vergeben")
 
+        # DM an Bewerber
+        if bewerber:
+            try:
+                embed = discord.Embed(
+                    title="Deine Bewerbung wurde angenommen! 🎉",
+                    color=discord.Color.from_rgb(0, 255, 0)
+                )
+                embed.add_field(name="Willkommen bei Lunation!", value="Deine Bewerbung wurde angenommen. Du hast jetzt die Trial-Rolle erhalten. Wir freuen uns auf dich im Raid!\n\nBei Fragen melde dich gerne bei den Offizieren.", inline=False)
+                await bewerber.send(embed=embed)
+            except discord.Forbidden:
+                logger.warning(f"Konnte DM an {bewerber.name} nicht senden (DM deaktiviert)")
+
         # Channel löschen
         await interaction.channel.delete()
         logger.info(f"Bewerbung von {self.bewerber_name} angenommen, Channel gelöscht")
@@ -208,6 +220,19 @@ class BewerbungEntscheidungView(discord.ui.View):
             embed.add_field(name="Entscheidung", value="Abgelehnt", inline=False)
             embed.add_field(name="Bearbeitet von", value=interaction.user.mention, inline=False)
             await transcripts_channel.send(embed=embed)
+
+        # DM an Bewerber
+        bewerber = interaction.guild.get_member(self.bewerber_id)
+        if bewerber:
+            try:
+                embed = discord.Embed(
+                    title="Deine Bewerbung wurde abgelehnt",
+                    color=discord.Color.from_rgb(255, 0, 0)
+                )
+                embed.add_field(name="Schade...", value="Leider wurde deine Bewerbung bei Lunation abgelehnt.\n\nWir wünschen dir viel Erfolg bei deiner Gildensuche!", inline=False)
+                await bewerber.send(embed=embed)
+            except discord.Forbidden:
+                logger.warning(f"Konnte DM an {bewerber.name} nicht senden (DM deaktiviert)")
 
         # Bewerbung schließen
         await interaction.response.send_message("Bewerbung abgelehnt.", ephemeral=True)
