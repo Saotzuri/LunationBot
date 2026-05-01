@@ -116,7 +116,6 @@ class BewerbungModal(discord.ui.Modal, title="Bewerbung bei Lunation"):
             f"{interaction.user.mention} Deine Bewerbung ist eingegangen! 🌙\n\n"
             f"Die Gildenleitung meldet sich so schnell wie möglich hier bei dir.\n"
             f"Falls du noch etwas ergänzen möchtest, schreib es einfach hier rein.\n\n"
-            f"{offizier_role.mention}"
         )
 
         # Offiziere im Offizier-Channel pingen
