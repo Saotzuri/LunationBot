@@ -1,7 +1,15 @@
 import os
+import logging
 import discord
 from discord import app_commands
 from dotenv import load_dotenv
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S"
+)
+logger = logging.getLogger("lunation-bot")
 
 load_dotenv()
 
@@ -27,9 +35,12 @@ BEWERBUNG_CHANNEL_ID = 1498614623065215007
 
 @client.event
 async def on_member_join(member: discord.Member):
+    logger.info(f"Member joined: {member.name} ({member.id})")
+
     role = member.guild.get_role(MEMBER_ROLE_ID)
     if role:
         await member.add_roles(role)
+        logger.info(f"Assigned role '{role.name}' to {member.name} ({member.id})")
 
     channel = client.get_channel(WILLKOMMEN_CHANNEL_ID)
     if channel:
@@ -47,11 +58,12 @@ async def on_member_join(member: discord.Member):
             inline=False
         )
         await channel.send(embed=embed)
+        logger.info(f"Sent welcome message to {member.name} ({member.id}) in channel {WILLKOMMEN_CHANNEL_ID}")
 
 
 @client.event
 async def on_ready():
-    print(f"Lunation is ready! Logged in as {client.user}")
+    logger.info(f"Lunation is ready! Logged in as {client.user}")
 
 
 def main():
