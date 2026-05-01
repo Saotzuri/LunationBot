@@ -39,6 +39,10 @@ BEWERBUNG_KATEGORIE_ID = 1498612750073462784
 TRIAL_ROLE_ID = 1498403894857044040
 TRANSCRIPTS_CHANNEL_ID = 1499747813070737518
 
+# Kummerkasten
+KUMMERKASTEN_CHANNEL_ID = 1499829416883392744
+KUMMERKASTEN_KATEGORIE_ID = 1498405467477643355
+
 # --- Modal ---
 
 class BewerbungModal(discord.ui.Modal, title="Bewerbung bei Lunation"):
@@ -136,6 +140,69 @@ class BewerbungModal(discord.ui.Modal, title="Bewerbung bei Lunation"):
         )
 
 
+# --- Kummerkasten Ticket System ---
+
+class KummerkastenModal(discord.ui.Modal, title="Kummerkasten Ticket"):
+    betreff = discord.ui.TextInput(
+        label="Kurze Beschreibung",
+        placeholder="Worum geht es?",
+        required=True,
+        max_length=100
+    )
+    nachricht = discord.ui.TextInput(
+        label="Was liegt dir auf dem Herzen?",
+        placeholder="Erzähl uns was dich beschäftigt...",
+        required=True,
+        style=discord.TextStyle.paragraph,
+        max_length=1500
+    )
+
+    async def on_submit(self, interaction: discord.Interaction):
+        guild = interaction.guild
+        offizier_role = guild.get_role(OFFIZIER_ROLE_ID)
+        kategorie = client.get_channel(KUMMERKASTEN_KATEGORIE_ID)
+
+        # Berechtigungen: nur User + Offiziere + Bot sehen den Channel
+        overwrites = {
+            guild.default_role: discord.PermissionOverwrite(view_channel=False),
+            interaction.user: discord.PermissionOverwrite(view_channel=True, send_messages=True),
+            offizier_role: discord.PermissionOverwrite(view_channel=True, send_messages=True),
+            guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True)
+        }
+
+        # Ticket Channel erstellen
+        ticket_channel = await guild.create_text_channel(
+            name=f"ticket-{interaction.user.name}",
+            category=kategorie,
+            overwrites=overwrites
+        )
+
+        # Embed im Ticket Channel
+        embed = discord.Embed(
+            title=f"Kummerkasten Ticket – {self.betreff.value}",
+            color=discord.Color.from_rgb(100, 100, 200)
+        )
+        embed.set_author(
+            name=f"{interaction.user.name}",
+            icon_url=interaction.user.display_avatar.url
+        )
+        embed.add_field(name="Beschreibung", value=self.betreff.value, inline=False)
+        embed.add_field(name="Nachricht", value=self.nachricht.value, inline=False)
+        embed.set_footer(text=f"User ID: {interaction.user.id}")
+
+        await ticket_channel.send(
+            f"{interaction.user.mention} {offizier_role.mention}",
+            embed=embed
+        )
+
+        logger.info(f"Kummerkasten Ticket von {interaction.user.name} erstellt, Channel: {ticket_channel.name}")
+
+        await interaction.response.send_message(
+            f"Dein Ticket wurde erstellt! Hier kannst du mit uns sprechen: {ticket_channel.mention}",
+            ephemeral=True
+        )
+
+
 # --- Button ---
 
 class BewerbungButton(discord.ui.View):
@@ -150,6 +217,20 @@ class BewerbungButton(discord.ui.View):
     )
     async def bewerbung(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_modal(BewerbungModal())
+
+
+class KummerkastenButton(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(
+        label="Ticket erstellen",
+        style=discord.ButtonStyle.grey,
+        emoji="💬",
+        custom_id="kummerkasten_button"
+    )
+    async def kummerkasten(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_modal(KummerkastenModal())
 
 
 # --- Bewerbung Entscheidung Buttons ---
@@ -269,6 +350,19 @@ async def bewerbung_setup(interaction: discord.Interaction):
     await interaction.response.send_message("Bewerbungs-Embed wurde gepostet!", ephemeral=True)
 
 
+@client.tree.command(name="kummerkasten-setup", description="Postet den Kummerkasten-Embed im aktuellen Channel")
+@app_commands.guilds(1498401477104762910)
+@app_commands.checks.has_permissions(administrator=True)
+async def kummerkasten_setup(interaction: discord.Interaction):
+    embed = discord.Embed(
+        title="Kummerkasten",
+        description="Dir liegt etwas auf dem Herzen?\nDu möchtest etwas loswerden oder einfach mit uns sprechen?\nKlick den Button unten und erstelle ein Ticket.\nDie Offiziere melden sich so schnell wie möglich bei dir.",
+        color=discord.Color.from_rgb(100, 100, 200)
+    )
+    await interaction.channel.send(embed=embed, view=KummerkastenButton())
+    await interaction.response.send_message("Kummerkasten-Embed wurde gepostet!", ephemeral=True)
+
+
 # --- Welcome ---
 
 @client.event
@@ -302,6 +396,7 @@ async def on_member_join(member: discord.Member):
 @client.event
 async def on_ready():
     client.add_view(BewerbungButton())
+    client.add_view(KummerkastenButton())
     logger.info(f"Lunation is ready! Logged in as {client.user}")
 
 
