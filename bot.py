@@ -398,6 +398,7 @@ async def post_raids() -> int:
                     start_time=raid_datetime,
                     end_time=raid_end_datetime,
                     location="WoWAudit",
+                    entity_type=discord.ScheduledEventEntityType.external,
                     privacy_level=discord.PrivacyLevel.guild_only
                 )
                 posted_raids.add(raid_id)
