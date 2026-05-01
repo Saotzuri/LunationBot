@@ -23,7 +23,9 @@ class Lunation(discord.Client):
         self.tree = app_commands.CommandTree(self)
 
     async def setup_hook(self):
-        await self.tree.sync()
+        guild = discord.Object(id=1498401477104762910)
+        self.tree.copy_global_to(guild=guild)
+        await self.tree.sync(guild=guild)
 
 client = Lunation()
 
