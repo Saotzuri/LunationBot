@@ -327,6 +327,19 @@ async def post_raids() -> int:
         logger.error(f"Fehler beim Laden der Raids: {e}")
         return 0
 
+    # Debug: Print response structure
+    logger.info(f"API Response type: {type(raids)}")
+    if raids:
+        logger.info(f"First item type: {type(raids[0])}")
+        logger.info(f"First item: {raids[0]}")
+
+    # Handle different response formats
+    if isinstance(raids, dict):
+        raids = raids.get("raids", [])
+    elif isinstance(raids, str):
+        logger.warning(f"API returned string instead of list: {raids}")
+        return 0
+
     guild = client.get_guild(GUILD_ID)
     if not guild:
         return 0
@@ -336,6 +349,8 @@ async def post_raids() -> int:
     count = 0
 
     for raid in raids:
+        if isinstance(raid, str):
+            continue
         raid_id = raid.get("id")
         if not raid_id or raid_id in posted_raids:
             continue
