@@ -166,6 +166,10 @@ class BewerbungEntscheidungView(discord.ui.View):
             await interaction.response.send_message("Nur Offiziere können diese Aktion durchführen.", ephemeral=True)
             return
 
+        # Prüfen ob Channel noch existiert
+        if not interaction.channel:
+            return
+
         guild = interaction.guild
         bewerber = guild.get_member(self.bewerber_id)
         trial_role = guild.get_role(TRIAL_ROLE_ID)
@@ -199,14 +203,21 @@ class BewerbungEntscheidungView(discord.ui.View):
             except discord.Forbidden:
                 logger.warning(f"Konnte DM an {bewerber.name} nicht senden (DM deaktiviert)")
 
-        # Channel löschen
-        await interaction.channel.delete()
-        logger.info(f"Bewerbung von {self.bewerber_name} angenommen, Channel gelöscht")
+        # Channel löschen (falls noch vorhanden)
+        try:
+            await interaction.channel.delete()
+            logger.info(f"Bewerbung von {self.bewerber_name} angenommen, Channel gelöscht")
+        except discord.NotFound:
+            logger.warning(f"Channel bereits gelöscht für {self.bewerber_name}")
 
     @discord.ui.button(label="Ablehnen", style=discord.ButtonStyle.red, emoji="❌", custom_id="bewerbung_ablehnen")
     async def ablehnen(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not interaction.guild.get_role(OFFIZIER_ROLE_ID) in interaction.user.roles:
             await interaction.response.send_message("Nur Offiziere können diese Aktion durchführen.", ephemeral=True)
+            return
+
+        # Prüfen ob Channel noch existiert
+        if not interaction.channel:
             return
 
         # Transcript erstellen und in den Transcripts-Channel posten
@@ -234,10 +245,13 @@ class BewerbungEntscheidungView(discord.ui.View):
             except discord.Forbidden:
                 logger.warning(f"Konnte DM an {bewerber.name} nicht senden (DM deaktiviert)")
 
-        # Bewerbung schließen
-        await interaction.response.send_message("Bewerbung abgelehnt.", ephemeral=True)
-        await interaction.channel.delete()
-        logger.info(f"Bewerbung von {self.bewerber_name} abgelehnt, Channel gelöscht")
+        # Bewerbung schließen (falls Channel noch existiert)
+        try:
+            await interaction.response.send_message("Bewerbung abgelehnt.", ephemeral=True)
+            await interaction.channel.delete()
+            logger.info(f"Bewerbung von {self.bewerber_name} abgelehnt, Channel gelöscht")
+        except discord.NotFound:
+            logger.warning(f"Channel bereits gelöscht für {self.bewerber_name}")
 
 
 # --- Command zum Posten des Bewerbungs-Embeds ---
