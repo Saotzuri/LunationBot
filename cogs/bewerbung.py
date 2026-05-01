@@ -1,13 +1,13 @@
 import discord
 import logging
 from discord import app_commands
-from discord.app_commands import Cog
 from config import (
     GUILD_ID, OFFIZIER_ROLE_ID, BEWERBUNG_KATEGORIE_ID,
     OFFIZIER_PING_CHANNEL_ID, TRIAL_ROLE_ID, TRANSCRIPTS_CHANNEL_ID
 )
 
 logger = logging.getLogger("lunation-bot")
+
 
 class BewerbungModal(discord.ui.Modal, title="Bewerbung bei Lunation"):
     klasse = discord.ui.TextInput(
@@ -204,11 +204,11 @@ class BewerbungEntscheidungView(discord.ui.View):
             logger.warning(f"Channel bereits gelöscht für {self.bewerber_name}")
 
 
-class BewerbungCog(Cog):
+class BewerbungCommands:
     def __init__(self, bot):
         self.bot = bot
 
-    @discord.app_commands.command(name="bewerbung-setup", description="Postet den Bewerbungs-Embed im aktuellen Channel")
+    @app_commands.command(name="bewerbung-setup", description="Postet den Bewerbungs-Embed im aktuellen Channel")
     @app_commands.guilds(GUILD_ID)
     @app_commands.checks.has_permissions(administrator=True)
     async def bewerbung_setup(self, interaction: discord.Interaction):
@@ -220,10 +220,8 @@ class BewerbungCog(Cog):
         await interaction.channel.send(embed=embed, view=BewerbungButton())
         await interaction.response.send_message("Bewerbungs-Embed wurde gepostet!", ephemeral=True)
 
-    async def cog_load(self):
-        self.bot.add_view(BewerbungButton())
-        self.bot.add_view(BewerbungEntscheidungView)
 
-
-async def setup(bot):
-    await bot.add_cog(BewerbungCog(bot))
+def setup(bot):
+    bot.add_view(BewerbungButton())
+    bot.add_view(BewerbungEntscheidungView)
+    bot.add_tree_exchange(BewerbungCommands(bot))

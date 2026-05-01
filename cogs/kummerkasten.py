@@ -1,7 +1,6 @@
 import discord
 import logging
 from discord import app_commands
-from discord.app_commands import Cog
 from config import GUILD_ID, OFFIZIER_ROLE_ID, KUMMERKASTEN_KATEGORIE_ID
 
 logger = logging.getLogger("lunation-bot")
@@ -95,11 +94,11 @@ class TicketSchliessenView(discord.ui.View):
         logger.info(f"Kummerkasten Ticket geschlossen von {interaction.user.name}")
 
 
-class KummerkastenCog(Cog):
+class KummerkastenCommands:
     def __init__(self, bot):
         self.bot = bot
 
-    @discord.app_commands.command(name="kummerkasten-setup", description="Postet den Kummerkasten-Embed im aktuellen Channel")
+    @app_commands.command(name="kummerkasten-setup", description="Postet den Kummerkasten-Embed im aktuellen Channel")
     @app_commands.guilds(GUILD_ID)
     @app_commands.checks.has_permissions(administrator=True)
     async def kummerkasten_setup(self, interaction: discord.Interaction):
@@ -111,10 +110,8 @@ class KummerkastenCog(Cog):
         await interaction.channel.send(embed=embed, view=KummerkastenButton())
         await interaction.response.send_message("Kummerkasten-Embed wurde gepostet!", ephemeral=True)
 
-    async def cog_load(self):
-        self.bot.add_view(KummerkastenButton())
-        self.bot.add_view(TicketSchliessenView())
 
-
-async def setup(bot):
-    await bot.add_cog(KummerkastenCog(bot))
+def setup(bot):
+    bot.add_view(KummerkastenButton())
+    bot.add_view(TicketSchliessenView())
+    bot.add_tree_exchange(KummerkastenCommands(bot))

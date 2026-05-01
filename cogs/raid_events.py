@@ -2,7 +2,7 @@ import discord
 import logging
 import asyncio
 from discord import app_commands
-from discord.app_commands import Cog
+from discord import Cog
 from datetime import datetime, timedelta
 from config import GUILD_ID, OFFIZIER_ROLE_ID
 from utils.wowaudit import wowaudit_api
