@@ -35,6 +35,7 @@ RULES_CHANNEL_ID = 1498405058650312754
 BEWERBUNG_CHANNEL_ID = 1498614623065215007
 OFFIZIER_ROLE_ID = 1498401628347437197
 OFFIZIER_PING_CHANNEL_ID = 1499744209798955049
+BEWERBUNG_KATEGORIE_ID = 1498612750073462784
 
 # --- Modal ---
 
@@ -73,11 +74,28 @@ class BewerbungModal(discord.ui.Modal, title="Bewerbung bei Lunation"):
     )
 
     async def on_submit(self, interaction: discord.Interaction):
-        channel = client.get_channel(BEWERBUNG_CHANNEL_ID)
+        guild = interaction.guild
+        offizier_role = guild.get_role(OFFIZIER_ROLE_ID)
+        kategorie = client.get_channel(BEWERBUNG_KATEGORIE_ID)
 
-        # Bewerbungs-Embed
+        # Berechtigungen: nur Bewerber + Offiziere + Bot sehen den Channel
+        overwrites = {
+            guild.default_role: discord.PermissionOverwrite(view_channel=False),
+            interaction.user: discord.PermissionOverwrite(view_channel=True, send_messages=True),
+            offizier_role: discord.PermissionOverwrite(view_channel=True, send_messages=True),
+            guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True)
+        }
+
+        # Privaten Channel erstellen
+        privater_channel = await guild.create_text_channel(
+            name=f"bewerbung-{interaction.user.name}",
+            category=kategorie,
+            overwrites=overwrites
+        )
+
+        # Bewerbungs-Embed im privaten Channel posten
         embed = discord.Embed(
-            title=f"Neue Bewerbung – {interaction.user.name}",
+            title=f"Bewerbung – {interaction.user.name}",
             color=discord.Color.from_rgb(130, 107, 7)
         )
         embed.set_author(
@@ -91,39 +109,28 @@ class BewerbungModal(discord.ui.Modal, title="Bewerbung bei Lunation"):
         embed.add_field(name="Warum Lunation?", value=self.warum.value, inline=False)
         embed.set_footer(text=f"User ID: {interaction.user.id}")
 
-        OFFIZIER_PING_CHANNEL_ID = 1499744209798955049
+        await privater_channel.send(embed=embed)
 
-        if channel:
-            offizier_role = interaction.guild.get_role(OFFIZIER_ROLE_ID)
-            
-            # Bewerbung ohne Ping im Bewerbungs-Channel posten
-            bewerbung_msg = await channel.send(embed=embed)
+        # Bewerber + Offiziere im privaten Channel begrüßen
+        await privater_channel.send(
+            f"{interaction.user.mention} Deine Bewerbung ist eingegangen! 🌙\n\n"
+            f"Die Gildenleitung meldet sich so schnell wie möglich hier bei dir.\n"
+            f"Falls du noch etwas ergänzen möchtest, schreib es einfach hier rein.\n\n"
+            f"{offizier_role.mention}"
+        )
 
-            # Thread erstellen
-            thread = await bewerbung_msg.create_thread(
-                name=f"Bewerbung – {interaction.user.name}",
-                auto_archive_duration=10080  # 7 Tage
+        # Offiziere im Offizier-Channel pingen
+        offizier_ping_channel = client.get_channel(OFFIZIER_PING_CHANNEL_ID)
+        if offizier_ping_channel:
+            await offizier_ping_channel.send(
+                f"{offizier_role.mention} Neue Bewerbung von {interaction.user.mention} eingegangen!\n"
+                f"Zum Channel: {privater_channel.mention}"
             )
 
-            # Bewerber im Thread begrüßen
-            await thread.send(
-                f"{interaction.user.mention} Deine Bewerbung ist eingegangen! 🌙\n\n"
-                f"Die Gildenleitung meldet sich so schnell wie möglich hier bei dir.\n"
-                f"Falls du noch etwas ergänzen möchtest, schreib es einfach hier rein."
-            )
-
-            # Offiziere separat im Offizier-Channel pingen
-            offizier_ping_channel = client.get_channel(OFFIZIER_PING_CHANNEL_ID)
-            if offizier_ping_channel:
-                await offizier_ping_channel.send(
-                    f"{offizier_role.mention} Neue Bewerbung von {interaction.user.mention} eingegangen!\n"
-                    f"Zum Thread: {thread.jump_url}"
-                )
-
-            logger.info(f"Bewerbung von {interaction.user.name} ({interaction.user.id}) eingegangen, Thread erstellt")
+        logger.info(f"Bewerbung von {interaction.user.name} ({interaction.user.id}) eingegangen, privater Channel erstellt")
 
         await interaction.response.send_message(
-            "Deine Bewerbung wurde erfolgreich abgeschickt! Schau in den Bewerbungs-Channel, dort wurde ein Thread für dich geöffnet.",
+            f"Deine Bewerbung wurde erfolgreich abgeschickt! Schau hier rein: {privater_channel.mention} 🌙",
             ephemeral=True
         )
 
@@ -153,7 +160,7 @@ async def bewerbung_setup(interaction: discord.Interaction):
     embed = discord.Embed(
         title="Tritt Lunation bei",
         description="Du willst mit uns Cutting Edge erreichen?\nKlick den Button unten und bewirb dich als Trial-Raider.\nDie Gildenleitung meldet sich so schnell wie möglich bei dir.",
-        color=discord.Color.from_rgb(0, 225, 255)
+        color=discord.Color.from_rgb(130, 107, 7)
     )
     await interaction.channel.send(embed=embed, view=BewerbungButton())
     await interaction.response.send_message("Bewerbungs-Embed wurde gepostet!", ephemeral=True)
