@@ -34,7 +34,7 @@ WILLKOMMEN_CHANNEL_ID = 1498404776650735676
 RULES_CHANNEL_ID = 1498405058650312754
 BEWERBUNG_CHANNEL_ID = 1498614623065215007
 OFFIZIER_ROLE_ID = 1498401628347437197
-
+OFFIZIER_PING_CHANNEL_ID = 1499744209798955049
 
 # --- Modal ---
 
@@ -91,13 +91,13 @@ class BewerbungModal(discord.ui.Modal, title="Bewerbung bei Lunation"):
         embed.add_field(name="Warum Lunation?", value=self.warum.value, inline=False)
         embed.set_footer(text=f"User ID: {interaction.user.id}")
 
+        OFFIZIER_PING_CHANNEL_ID = 1499744209798955049
+
         if channel:
-            # Bewerbung posten + Offiziere pingen
             offizier_role = interaction.guild.get_role(OFFIZIER_ROLE_ID)
-            bewerbung_msg = await channel.send(
-                content=f"{offizier_role.mention} Neue Bewerbung eingegangen!",
-                embed=embed
-            )
+            
+            # Bewerbung ohne Ping im Bewerbungs-Channel posten
+            bewerbung_msg = await channel.send(embed=embed)
 
             # Thread erstellen
             thread = await bewerbung_msg.create_thread(
@@ -105,13 +105,20 @@ class BewerbungModal(discord.ui.Modal, title="Bewerbung bei Lunation"):
                 auto_archive_duration=10080  # 7 Tage
             )
 
-            # Bewerber + Offiziere in Thread einladen
+            # Bewerber im Thread begrüßen
             await thread.send(
                 f"{interaction.user.mention} Deine Bewerbung ist eingegangen! 🌙\n\n"
                 f"Die Gildenleitung meldet sich so schnell wie möglich hier bei dir.\n"
-                f"Falls du noch etwas ergänzen möchtest, schreib es einfach hier rein.\n\n"
-                f"{offizier_role.mention}"
+                f"Falls du noch etwas ergänzen möchtest, schreib es einfach hier rein."
             )
+
+            # Offiziere separat im Offizier-Channel pingen
+            offizier_ping_channel = client.get_channel(OFFIZIER_PING_CHANNEL_ID)
+            if offizier_ping_channel:
+                await offizier_ping_channel.send(
+                    f"{offizier_role.mention} Neue Bewerbung von {interaction.user.mention} eingegangen!\n"
+                    f"Zum Thread: {thread.jump_url}"
+                )
 
             logger.info(f"Bewerbung von {interaction.user.name} ({interaction.user.id}) eingegangen, Thread erstellt")
 
