@@ -146,7 +146,7 @@ async def bewerbung_setup(interaction: discord.Interaction):
     embed = discord.Embed(
         title="Tritt Lunation bei",
         description="Du willst mit uns Cutting Edge erreichen?\nKlick den Button unten und bewirb dich als Trial-Raider.\nDie Gildenleitung meldet sich so schnell wie möglich bei dir.",
-        color=discord.Color.from_rgb(130, 107, 7)
+        color=discord.Color.from_rgb(0, 225, 255)
     )
     await interaction.channel.send(embed=embed, view=BewerbungButton())
     await interaction.response.send_message("Bewerbungs-Embed wurde gepostet!", ephemeral=True)
