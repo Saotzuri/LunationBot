@@ -192,7 +192,8 @@ class KummerkastenModal(discord.ui.Modal, title="Kummerkasten Ticket"):
 
         await ticket_channel.send(
             f"{interaction.user.mention} {offizier_role.mention}",
-            embed=embed
+            embed=embed,
+            view=TicketSchliessenView()
         )
 
         logger.info(f"Kummerkasten Ticket von {interaction.user.name} erstellt, Channel: {ticket_channel.name}")
@@ -231,6 +232,21 @@ class KummerkastenButton(discord.ui.View):
     )
     async def kummerkasten(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_modal(KummerkastenModal())
+
+
+class TicketSchliessenView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(label="Ticket schließen", style=discord.ButtonStyle.red, emoji="🔒", custom_id="ticket_schliessen")
+    async def schliessen(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not interaction.guild.get_role(OFFIZIER_ROLE_ID) in interaction.user.roles:
+            await interaction.response.send_message("Nur Offiziere können Tickets schließen.", ephemeral=True)
+            return
+
+        await interaction.response.send_message("Ticket wird geschlossen...", ephemeral=True)
+        await interaction.channel.delete()
+        logger.info(f"Kummerkasten Ticket geschlossen von {interaction.user.name}")
 
 
 # --- Bewerbung Entscheidung Buttons ---
@@ -397,6 +413,7 @@ async def on_member_join(member: discord.Member):
 async def on_ready():
     client.add_view(BewerbungButton())
     client.add_view(KummerkastenButton())
+    client.add_view(TicketSchliessenView())
     logger.info(f"Lunation is ready! Logged in as {client.user}")
 
 
