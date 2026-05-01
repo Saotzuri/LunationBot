@@ -2,6 +2,7 @@ import os
 import logging
 import discord
 from discord import app_commands
+from discord.scheduled_event import EntityType
 from dotenv import load_dotenv
 from config import (
     GUILD_ID, WILLKOMMEN_CHANNEL_ID, RULES_CHANNEL_ID,
@@ -398,7 +399,7 @@ async def post_raids() -> int:
                     start_time=raid_datetime,
                     end_time=raid_end_datetime,
                     location="WoWAudit",
-                    entity_type=discord.ScheduledEventEntityType.external,
+                    entity_type=EntityType.external,
                     privacy_level=discord.PrivacyLevel.guild_only
                 )
                 posted_raids.add(raid_id)
