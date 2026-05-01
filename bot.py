@@ -363,25 +363,38 @@ async def post_raids() -> int:
             continue
 
         raid_date_str = raid.get("date", "")
-        raid_time = raid.get("time", "19:00")
-        raid_name = raid.get("name", f"Raid {raid_id}")
-        raid_note = raid.get("note", "")
+        raid_time = raid.get("start_time", "19:00")
+        raid_end_time = raid.get("end_time", "22:00")
+        raid_name = f"{raid.get('instance', 'Raid')} ({raid.get('difficulty', 'Mythic')})"
+        optional = raid.get("optional", False)
+        status = raid.get("status", "Planned")
+
+        # Skip past raids
+        if status == "Locked":
+            continue
 
         try:
-            raid_date = datetime.strptime(raid_date_str, "%A, %B %d, %Y")
-            raid_date = raid_date.replace(year=now.year)
+            raid_date = datetime.strptime(raid_date_str, "%Y-%m-%d")
             hour, minute = map(int, raid_time.split(":"))
             raid_datetime = raid_date.replace(hour=hour, minute=minute)
-        except:
+            end_hour, end_minute = map(int, raid_end_time.split(":"))
+            raid_end_datetime = raid_date.replace(hour=end_hour, minute=end_minute)
+        except Exception as e:
+            logger.warning(f"Date parse error: {e}")
             continue
 
         if now <= raid_datetime <= cutoff:
             try:
+                description = f"{status}"
+                if optional:
+                    description += " (optional)"
+                description += f"\n\n{' - '.join(raid.get('instances', []))}"
+
                 await guild.create_scheduled_event(
                     name=f"📅 {raid_name}",
-                    description=raid_note or "Raider gefragt!",
+                    description=description,
                     start_time=raid_datetime,
-                    end_time=raid_datetime + timedelta(hours=3),
+                    end_time=raid_end_datetime,
                     location="WoWAudit",
                     privacy_level=discord.PrivacyLevel.guild_only
                 )
