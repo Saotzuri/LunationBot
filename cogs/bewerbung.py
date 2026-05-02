@@ -223,5 +223,4 @@ class BewerbungCommands:
 
 def setup(bot):
     bot.add_view(BewerbungButton())
-    bot.add_view(BewerbungEntscheidungView)
     bot.add_tree_exchange(BewerbungCommands(bot))
