@@ -135,17 +135,32 @@ class BewerbungEntscheidungView(discord.ui.View):
             await interaction.response.send_message("Nur Offiziere!", ephemeral=True)
             return
 
+        await interaction.response.send_modal(BewerbungAblehnenModal(self.bewerber_id, self.bewerber_name))
+
+
+class BewerbungAblehnenModal(discord.ui.Modal, title="Bewerbung ablehnen"):
+    grund = discord.ui.TextInput(label="Grund der Ablehnung", placeholder="Warum wird die Bewerbung abgelehnt?", style=discord.TextStyle.paragraph, required=True, max_length=1000)
+
+    def __init__(self, bewerber_id: int, bewerber_name: str):
+        super().__init__(timeout=None)
+        self.bewerber_id = bewerber_id
+        self.bewerber_name = bewerber_name
+
+    async def on_submit(self, interaction: discord.Interaction):
         transcripts_channel = interaction.guild.get_channel(TRANSCRIPTS_CHANNEL_ID)
         if transcripts_channel:
             embed = discord.Embed(title=f"Bewerbung abgelehnt – {self.bewerber_name}", color=discord.Color.from_rgb(255, 0, 0))
             embed.add_field(name="Bewerber", value=f"<@{self.bewerber_id}>", inline=False)
             embed.add_field(name="Entscheidung", value="Abgelehnt", inline=False)
+            embed.add_field(name="Grund", value=self.grund.value, inline=False)
             await transcripts_channel.send(embed=embed)
 
         bewerber = interaction.guild.get_member(self.bewerber_id)
         if bewerber:
             try:
-                await bewerber.send(embed=discord.Embed(title="Deine Bewerbung wurde abgelehnt", color=discord.Color.from_rgb(255, 0, 0), description="Schade... Wir wünschen dir viel Erfolg bei deiner Gildensuche!"))
+                embed = discord.Embed(title="Deine Bewerbung wurde abgelehnt", color=discord.Color.from_rgb(255, 0, 0))
+                embed.add_field(name="Schade... Wir wünschen dir viel Erfolg bei deiner Gildensuche!", value=self.grund.value, inline=False)
+                await bewerber.send(embed=embed)
             except:
                 pass
 
