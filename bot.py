@@ -1,10 +1,14 @@
 import os
 import logging
+from zoneinfo import ZoneInfo
 import discord
+import datetime
+import requests
 from discord import app_commands
+from discord.ext import tasks
 from dotenv import load_dotenv
 from config import (
-    GUILD_ID, WILLKOMMEN_CHANNEL_ID, RULES_CHANNEL_ID,
+    GUILD_ID, RAID_SIGNUP_CHANNEL_ID, RAIDER_ROLE_ID, WILLKOMMEN_CHANNEL_ID, RULES_CHANNEL_ID,
     MEMBER_ROLE_ID, BEWERBUNG_CHANNEL_ID,
     OFFIZIER_ROLE_ID, BEWERBUNG_KATEGORIE_ID,
     OFFIZIER_PING_CHANNEL_ID, TRIAL_ROLE_ID, TRANSCRIPTS_CHANNEL_ID,
@@ -24,6 +28,7 @@ intents = discord.Intents.default()
 intents.members = True
 intents.message_content = True
 
+GERMAN_TZ = ZoneInfo("Europe/Berlin")
 
 class Lunation(discord.Client):
     def __init__(self):
@@ -33,7 +38,13 @@ class Lunation(discord.Client):
     async def setup_hook(self):
         self.tree.copy_global_to(guild=discord.Object(id=GUILD_ID))
         await self.tree.sync(guild=discord.Object(id=GUILD_ID))
+        self.raid_reminder_loop.start()
 
+    @tasks.loop(time=datetime.time(hour=19, minute=0, tzinfo=GERMAN_TZ))
+    # @tasks.loop(minutes=1)
+    async def raid_reminder_loop(self):
+        await self.wait_until_ready()
+        await raidReminder(self)
 
 client = Lunation()
 
@@ -271,6 +282,106 @@ async def on_member_join(member: discord.Member):
             inline=False
         )
         await channel.send(embed=embed)
+
+# ======================
+# ==== RAID REMINDER ====
+# ======================
+
+WOWAUDIT_API_KEY = os.getenv("WOWAUDIT_TOKEN")
+async def getUnknownRaiders():
+    headers = {'accept': 'application/json', 'Authorization': WOWAUDIT_API_KEY}
+    raids_url = 'https://www.wowaudit.com/v1/raids?include_past=false'
+    
+    try:
+        response = requests.get(raids_url, headers=headers)
+        if response.status_code != 200: return None, []
+        
+        raids = response.json().get("raids", [])
+        if not raids: return None, []
+
+        next_raid = raids[0] 
+        
+        details_url = f'https://www.wowaudit.com/v1/raids/{next_raid["id"]}'
+        details_response = requests.get(details_url, headers=headers)
+        if details_response.status_code != 200: return None, []
+
+        signups = details_response.json().get("signups", [])
+        unknown_names = [s["character"]["name"] for s in signups if s["status"] == "Unknown"]
+        
+        return next_raid, unknown_names
+    except Exception as e:
+        logger.error(f"Fehler in getUnknownRaiders: {e}")
+        return None, []
+    
+async def raidReminder(self):
+    guild = self.get_guild(GUILD_ID)
+    if not guild:
+        logger.error("Raid-Reminder: Gilde konnte nicht geladen werden.")
+        return
+
+    raid_info, unknown_names = await getUnknownRaiders()
+    if not raid_info:
+        return
+    
+    try:
+        raid_date_str = raid_info.get('date')
+        raid_date = datetime.datetime.strptime(raid_date_str, "%Y-%m-%d").date()
+        tomorrow = datetime.date.today() + datetime.timedelta(days=1)
+        if raid_date != tomorrow:
+            logger.info(f"Reminder übersprungen: Raid ist am {raid_date}, heute ist erst der {datetime.date.today()}.")
+            return
+    except Exception as e:
+        logger.error(f"Fehler beim Datumsvergleich: {e}")
+        return
+    
+    if len(unknown_names) == 0:
+        return
+
+    raider_role = guild.get_role(RAIDER_ROLE_ID)
+    trial_role = guild.get_role(TRIAL_ROLE_ID)
+    raid_signup_channel = guild.get_channel(RAID_SIGNUP_CHANNEL_ID)
+
+    relevant_members = []
+    if raider_role: relevant_members.extend(raider_role.members)
+    if trial_role: relevant_members.extend(trial_role.members)
+
+    relevant_members = list(set(relevant_members)) # remove duplicates 
+
+    raid_string = f"{raid_info.get('instance', {})} {raid_info.get('difficulty', '')} am {raid_date.strftime('%d.%m.%Y')} ({raid_date.strftime('%A')})".strip()
+
+    for wow_name in unknown_names:
+        # if (wow_name != "Magemitcasio"):
+        #     continue
+        found = False
+        for member in relevant_members:
+            if member.bot: continue
+
+            display_name_parts = member.display_name.split('|')
+            ingame_name_on_discord = display_name_parts[0].strip().lower()
+
+            if ingame_name_on_discord == wow_name.lower():
+                try:
+                    embed = discord.Embed(
+                        title="Erinnerung: Raid-Anmeldung",
+                        description=f"Hey {member.mention},\n\ndu bist für den Raid **{raid_string}** aktuell noch als **'Unknown'** gelistet.",
+                        color=discord.Color.from_rgb(130, 107, 7)
+                    )
+                    embed.add_field(
+                        name="", 
+                        value=f"Bitte gib uns im {raid_signup_channel.mention} Bescheid, ob du dabei bist."
+                    )
+                    embed.set_footer(text="Dieser Reminder erfolgt automatisch. Bei Fragen wende dich gerne an die Offiziere.")
+                    
+                    await member.send(embed=embed)
+                    logger.info(f"DM gesendet an: {member.display_name} (WoW: {wow_name})")
+                    found = True
+                except discord.Forbidden:
+                    logger.warning(f"Konnte {member.display_name} keine DM senden (DMs blockiert).")
+                except Exception as e:
+                    logger.error(f"Fehler beim Senden an {member.display_name}: {e}")
+                
+                if found: 
+                    break
 
 
 @client.event
