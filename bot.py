@@ -288,41 +288,65 @@ async def on_member_join(member: discord.Member):
 # ======================
 
 WOWAUDIT_API_KEY = os.getenv("WOWAUDIT_TOKEN")
-async def getUnknownRaiders():
+WOWAUDIT_API_URL = os.getenv("WOWAUDIT_API_URL", "https://www.wowaudit.com")
+
+async def getCharactersWithDiscordIds():
     headers = {'accept': 'application/json', 'Authorization': WOWAUDIT_API_KEY}
-    raids_url = 'https://www.wowaudit.com/v1/raids?include_past=false'
-    
+    characters_url = f'{WOWAUDIT_API_URL}/v1/characters'
+
+    try:
+        response = requests.get(characters_url, headers=headers)
+        if response.status_code != 200:
+            logger.error(f"Fehler beim Laden der Charaktere: {response.status_code}")
+            return []
+
+        characters = response.json()
+        # note enthält die Discord User ID
+        return [c for c in characters if c.get("note")]
+    except Exception as e:
+        logger.error(f"Fehler in getCharactersWithDiscordIds: {e}")
+        return []
+
+async def getNextRaid():
+    headers = {'accept': 'application/json', 'Authorization': WOWAUDIT_API_KEY}
+    raids_url = f'{WOWAUDIT_API_URL}/v1/raids?include_past=false'
+
     try:
         response = requests.get(raids_url, headers=headers)
-        if response.status_code != 200: return None, []
-        
+        if response.status_code != 200: return None
+
         raids = response.json().get("raids", [])
-        if not raids: return None, []
-
-        next_raid = raids[0] 
-        
-        details_url = f'https://www.wowaudit.com/v1/raids/{next_raid["id"]}'
-        details_response = requests.get(details_url, headers=headers)
-        if details_response.status_code != 200: return None, []
-
-        signups = details_response.json().get("signups", [])
-        unknown_names = [s["character"]["name"] for s in signups if s["status"] == "Unknown"]
-        
-        return next_raid, unknown_names
+        if not raids: return None
+        return raids[0]
     except Exception as e:
-        logger.error(f"Fehler in getUnknownRaiders: {e}")
-        return None, []
-    
+        logger.error(f"Fehler in getNextRaid: {e}")
+        return None
+
+async def getUnknownSignups(raid_id):
+    headers = {'accept': 'application/json', 'Authorization': WOWAUDIT_API_KEY}
+    details_url = f'{WOWAUDIT_API_URL}/v1/raids/{raid_id}'
+
+    try:
+        response = requests.get(details_url, headers=headers)
+        if response.status_code != 200: return []
+
+        signups = response.json().get("signups", [])
+        return [s["character"]["name"] for s in signups if s["status"] == "Unknown"]
+    except Exception as e:
+        logger.error(f"Fehler in getUnknownSignups: {e}")
+        return []
+
 async def raidReminder(self):
     guild = self.get_guild(GUILD_ID)
     if not guild:
         logger.error("Raid-Reminder: Gilde konnte nicht geladen werden.")
         return
 
-    raid_info, unknown_names = await getUnknownRaiders()
+    raid_info = await getNextRaid()
     if not raid_info:
+        logger.info("Kein Raid gefunden.")
         return
-    
+
     try:
         raid_date_str = raid_info.get('date')
         raid_date = datetime.datetime.strptime(raid_date_str, "%Y-%m-%d").date()
@@ -333,55 +357,70 @@ async def raidReminder(self):
     except Exception as e:
         logger.error(f"Fehler beim Datumsvergleich: {e}")
         return
-    
-    if len(unknown_names) == 0:
+
+    # Unknown-Signups vom nächsten Raid holen
+    unknown_names = await getUnknownSignups(raid_info["id"])
+    if not unknown_names:
+        logger.info("Keine Unknown-Signups gefunden.")
         return
 
-    raider_role = guild.get_role(RAIDER_ROLE_ID)
-    trial_role = guild.get_role(TRIAL_ROLE_ID)
+    # Characters mit Discord-IDs holen
+    characters = await getCharactersWithDiscordIds()
+    if not characters:
+        logger.info("Keine Charaktere mit Discord-ID gefunden.")
+        return
+
+    # Mapping: char_name -> discord_id
+    char_to_discord = {
+        c["name"].lower(): c["note"].strip()
+        for c in characters
+        if c.get("note") and c["note"].strip().isdigit()
+    }
+
     raid_signup_channel = guild.get_channel(RAID_SIGNUP_CHANNEL_ID)
-
-    relevant_members = []
-    if raider_role: relevant_members.extend(raider_role.members)
-    if trial_role: relevant_members.extend(trial_role.members)
-
-    relevant_members = list(set(relevant_members)) # remove duplicates 
-
     raid_string = f"{raid_info.get('instance', {})} {raid_info.get('difficulty', '')} am {raid_date.strftime('%d.%m.%Y')} ({raid_date.strftime('%A')})".strip()
 
+    # Debug: Nur an bestimmten Charakter senden (z.B. "Magemitcasio")
+    debug_char = os.getenv("RAID_REMINDER_DEBUG_CHAR")
+    if debug_char:
+        unknown_names = [debug_char] if debug_char.lower() in [n.lower() for n in unknown_names] else []
+
     for wow_name in unknown_names:
-        # if (wow_name != "Magemitcasio"):
-        #     continue
-        found = False
-        for member in relevant_members:
-            if member.bot: continue
+        discord_id_str = char_to_discord.get(wow_name.lower())
+        if not discord_id_str:
+            logger.info(f"Keine Discord-ID gefunden für: {wow_name}")
+            continue
 
-            display_name_parts = member.display_name.split('|')
-            ingame_name_on_discord = display_name_parts[0].strip().lower()
+        discord_id = int(discord_id_str)
 
-            if ingame_name_on_discord == wow_name.lower():
-                try:
-                    embed = discord.Embed(
-                        title="Erinnerung: Raid-Anmeldung",
-                        description=f"Hey {member.mention},\n\ndu bist für den Raid **{raid_string}** aktuell noch als **'Unknown'** gelistet.",
-                        color=discord.Color.from_rgb(130, 107, 7)
-                    )
-                    embed.add_field(
-                        name="", 
-                        value=f"Bitte gib uns im {raid_signup_channel.mention} Bescheid, ob du dabei bist."
-                    )
-                    embed.set_footer(text="Dieser Reminder erfolgt automatisch. Bei Fragen wende dich gerne an die Offiziere.")
-                    
-                    await member.send(embed=embed)
-                    logger.info(f"DM gesendet an: {member.display_name} (WoW: {wow_name})")
-                    found = True
-                except discord.Forbidden:
-                    logger.warning(f"Konnte {member.display_name} keine DM senden (DMs blockiert).")
-                except Exception as e:
-                    logger.error(f"Fehler beim Senden an {member.display_name}: {e}")
-                
-                if found: 
-                    break
+        try:
+            member = await guild.fetch_member(discord_id)
+            if not member:
+                logger.warning(f"Member nicht gefunden: Discord ID {discord_id} (WoW: {wow_name})")
+                continue
+
+            if member.bot:
+                continue
+
+            embed = discord.Embed(
+                title="Erinnerung: Raid-Anmeldung",
+                description=f"Hey {member.mention},\n\ndu bist für den Raid **{raid_string}** aktuell noch als **'Unknown'** gelistet.",
+                color=discord.Color.from_rgb(130, 107, 7)
+            )
+            embed.add_field(
+                name="",
+                value=f"Bitte gib uns im {raid_signup_channel.mention} Bescheid, ob du dabei bist."
+            )
+            embed.set_footer(text="Dieser Reminder erfolgt automatisch. Bei Fragen wende dich gerne an die Offiziere.")
+
+            await member.send(embed=embed)
+            logger.info(f"DM gesendet an: {member.display_name} (WoW: {wow_name})")
+        except discord.NotFound:
+            logger.warning(f"Member nicht gefunden: Discord ID {discord_id}")
+        except discord.Forbidden:
+            logger.warning(f"Konnte {member.display_name} keine DM senden (DMs blockiert).")
+        except Exception as e:
+            logger.error(f"Fehler beim Senden an {wow_name}: {e}")
 
 
 @client.event
