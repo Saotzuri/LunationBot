@@ -38,7 +38,7 @@ class RaidReminderClient:
         try:
             raid_date_str = raid_info.get('date')
             raid_date = datetime.datetime.strptime(raid_date_str, "%Y-%m-%d").date()
-            tomorrow = datetime.date.today() + datetime.timedelta(days=1)
+            tomorrow = datetime.date.today() + datetime.timedelta(days=2)
             if raid_date != tomorrow:
                 logger.info(f"Reminder übersprungen: Raid ist am {raid_date}, heute ist erst der {datetime.date.today()}.")
                 return
